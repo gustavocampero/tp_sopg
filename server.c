@@ -42,48 +42,55 @@ cmd_t getCmdCode(const char* cmd) {
 }
 
 int openServer() {
-        int s;
-        struct sockaddr_in serveraddr;
+	int s;
+	struct sockaddr_in serveraddr;
 
-        s = socket(AF_INET, SOCK_STREAM, 0);
-        if(s < 0){
-                perror("socket");
-                exit(EXIT_FAILURE);
-        }
-
-        bzero((char *)&serveraddr, sizeof(serveraddr));
-        serveraddr.sin_family = AF_INET;
-        serveraddr.sin_port = htons(PORT);
-        if (inet_pton(AF_INET, HOST, &(serveraddr.sin_addr)) <= 0) {
-                fprintf(stderr, "ERROR invalid server IP\n");
-                exit(EXIT_FAILURE);
-        }
-
-        if (bind(s, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) == -1) {
-                perror("bind");
-                close(s);
+	s = socket(AF_INET, SOCK_STREAM, 0);
+	if(s < 0){
+		perror("socket");
 		exit(EXIT_FAILURE);
-        }
+	}
 
-        if (listen(s, 5) == -1) {
-                perror("listen");
+	bzero((char *)&serveraddr, sizeof(serveraddr));
+	serveraddr.sin_family = AF_INET;
+	serveraddr.sin_port = htons(PORT);
+	if (inet_pton(AF_INET, HOST, &(serveraddr.sin_addr)) <= 0) {
+		fprintf(stderr, "ERROR invalid server IP\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if (bind(s, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) == -1) {
+		perror("bind");
 		close(s);
-                exit(EXIT_FAILURE);
-        }
+		exit(EXIT_FAILURE);
+	}
 
-        return s;
+	if (listen(s, 5) == -1) {
+		perror("listen");
+		close(s);
+		exit(EXIT_FAILURE);
+	}
+
+	return s;
 }
 
 void clientRead(int client) {
-        char rcv[MAX_BUFFER_SIZE] = {0};
+	char rcv[MAX_BUFFER_SIZE] = {0};
 
-        int rcv_size = read(client, rcv, MAX_BUFFER_SIZE);
-        if (rcv_size == -1) {
-            perror("read");
-            exit(EXIT_FAILURE);
-        }
-        rcv[rcv_size] = 0x00;
-        printf("[SERVER]: %d bytes recibidos. Msg=%s", rcv_size, rcv);
+	int rcv_size = read(client, rcv, MAX_BUFFER_SIZE);
+	if (rcv_size == -1) {
+		perror("read");
+		exit(EXIT_FAILURE);
+	}
+
+	// Si el cliente cierra la conexion sin enviar datos...
+	if (rcv_size == 0) {
+		printf("[SERVER]: Conexión cerrada por el cliente antes de enviar datos\n");
+		return;
+	}
+
+	rcv[rcv_size] = 0x00;
+	printf("[SERVER]: %d bytes recibidos. Msg=%s", rcv_size, rcv);
 
 	processMsg(rcv, rcv_size, client);
 	return;
@@ -91,10 +98,10 @@ void clientRead(int client) {
 
 void clientWrite(int client, const char* msg, size_t msg_len) {
 	int snd_size = write(client, msg, msg_len);
-        if (snd_size == -1) {
-                perror("write");
-                exit(EXIT_FAILURE);
-        }
+	if (snd_size == -1) {
+		perror("write");
+		exit(EXIT_FAILURE);
+	}
 }
 
 void processMsg(char* msg, size_t msg_len, int client) {
@@ -141,10 +148,10 @@ void processMsg(char* msg, size_t msg_len, int client) {
 }
 
 void doSet(int client, const char* key, const char* value) {
-       if(!value || !key) {
-                clientWrite(client, ERROR_MSG, strlen(ERROR_MSG));
-                return;
-        }
+	if(!value || !key) {
+		clientWrite(client, ERROR_MSG, strlen(ERROR_MSG));
+		return;
+	}
 
 	printf("[SERVER]: SET - key(%s) value(%s)\n", key, value);
 	int fd = open(key, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -168,10 +175,10 @@ void doSet(int client, const char* key, const char* value) {
 }
 
 void doGet(int client, const char* key) {
-        if(!key) {
-                clientWrite(client, ERROR_MSG, strlen(ERROR_MSG));
-                return;
-        }
+	if(!key) {
+		clientWrite(client, ERROR_MSG, strlen(ERROR_MSG));
+		return;
+	}
 
 	printf("[SERVER]: GET - key(%s)\n", key);
 	char value[MAX_BUFFER_SIZE];
@@ -202,10 +209,10 @@ void doGet(int client, const char* key) {
 }
 
 void doDel(int client, const char* key) {
-        if(!key) {
-                clientWrite(client, ERROR_MSG, strlen(ERROR_MSG));
-                return;
-        }
+	if(!key) {
+		clientWrite(client, ERROR_MSG, strlen(ERROR_MSG));
+		return;
+	}
 
 	printf("[SERVER]: DEL - key(%s)\n", key);
 
@@ -227,29 +234,29 @@ void doDel(int client, const char* key) {
 
 int main(void) {
 
-    	int server_fd = openServer();
+	int server_fd = openServer();
 
 	while(1) {
-    		socklen_t clientaddr_len = sizeof(struct sockaddr_in);
-    		struct sockaddr_in clientaddr;
+		socklen_t clientaddr_len = sizeof(struct sockaddr_in);
+		struct sockaddr_in clientaddr;
 
-        	printf("[SERVER]: Esperando una conexion... (port: %d)\n", PORT);
-        	int client_fd = accept(server_fd, (struct sockaddr *)&clientaddr, &clientaddr_len);
-        	if(client_fd < 0) {
-           		perror("accept");
-            		continue;
+		printf("[SERVER]: Esperando una conexion... (port: %d)\n", PORT);
+		int client_fd = accept(server_fd, (struct sockaddr *)&clientaddr, &clientaddr_len);
+		if(client_fd < 0) {
+			perror("accept");
+			continue;
 		}
 
-        	char client_ip[INET_ADDRSTRLEN] = {0};
-        	inet_ntop(AF_INET, &(clientaddr.sin_addr), client_ip, sizeof(client_ip));
-        	printf("[SERVER]: %s conectado!\n", client_ip);
+		char client_ip[INET_ADDRSTRLEN] = {0};
+		inet_ntop(AF_INET, &(clientaddr.sin_addr), client_ip, sizeof(client_ip));
+		printf("[SERVER]: %s conectado!\n", client_ip);
 
-        	clientRead(client_fd);
+		clientRead(client_fd);
 
-        	close(client_fd);
-    	}
+		close(client_fd);
+	}
 
 	close(server_fd);
 
-    	return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }
